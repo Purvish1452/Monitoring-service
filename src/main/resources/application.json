@@ -1,0 +1,26 @@
+{
+  "http": {
+    "port": 8080,
+    "host": "0.0.0.0"
+  },
+  "monitoring": {
+    "maxConcurrentChecks": 500,
+    "schedulerTickMs": 20,
+    "defaultIntervalMs": 1000,
+    "defaultTimeoutMs": 3000,
+    "defaultMaxAttempts": 3,
+    "defaultBaseDelayMs": 200,
+    "defaultBackoffFactor": 2.0
+  },
+  "persistence": {
+    "targetsFilePath": "data/targets.json",
+    "auditLogFilePath": "data/audit.jsonl",
+    "flushIntervalMs": 1000,
+    "bufferCapacity": 100
+  },
+  "mock": {
+    "enabled": true,
+    "httpPort": 8081,
+    "tcpPort": 9000
+  }
+}
