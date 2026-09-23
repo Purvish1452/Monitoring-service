@@ -9,6 +9,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,7 @@ import org.slf4j.LoggerFactory;
  * HttpServerVerticle:
  * 1. Serves non-blocking REST API for single and bulk target registration.
  * 2. Provides isolated /health endpoint that answers immediately in-memory in < 2ms (satisfying AC 2).
- * 3. Serves live Web UI Dashboard for browser interaction.
+ * 3. Serves decoupled static Web UI (HTML, CSS, JS) via StaticHandler from webroot/.
  */
 public class HttpServerVerticle extends AbstractVerticle {
 
@@ -52,9 +53,13 @@ public class HttpServerVerticle extends AbstractVerticle {
         router.get("/api/alerts").handler(this::handleListAlerts);
         router.get("/api/metrics").handler(this::handleGetMetrics);
 
-        // Web UI Dashboard
-        router.get("/").handler(this::handleDashboard);
-        router.get("/dashboard").handler(this::handleDashboard);
+        // Decoupled Static Frontend Handler (webroot/)
+        StaticHandler staticHandler = StaticHandler.create("webroot")
+                .setIndexPage("index.html")
+                .setCachingEnabled(true);
+
+        router.route("/dashboard").handler(ctx -> ctx.reroute("/index.html"));
+        router.route("/*").handler(staticHandler);
 
         io.vertx.core.http.HttpServerOptions serverOptions = new io.vertx.core.http.HttpServerOptions()
                 .setReuseAddress(true)
@@ -175,95 +180,6 @@ public class HttpServerVerticle extends AbstractVerticle {
                 .put("availableProcessors", runtime.availableProcessors());
 
         ctx.response().putHeader("content-type", "application/json").end(metrics.encode());
-    }
-
-    private void handleDashboard(RoutingContext ctx) {
-        String html = """
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Network Endpoint Monitoring Dashboard</title>
-                    <style>
-                        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
-                        .container { max-width: 1200px; margin: 0 auto; }
-                        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 16px; margin-bottom: 24px; }
-                        .badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-                        .badge-up { background: #059669; color: white; }
-                        .badge-down { background: #dc2626; color: white; }
-                        .badge-degraded { background: #d97706; color: white; }
-                        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
-                        .card { background: #1e293b; border-radius: 8px; padding: 20px; border: 1px solid #334155; }
-                        .card-title { font-size: 13px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
-                        .card-value { font-size: 28px; font-weight: 700; color: #38bdf8; }
-                        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
-                        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #334155; font-size: 14px; }
-                        th { background: #334155; color: #cbd5e1; font-weight: 600; }
-                        button { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
-                        button:hover { background: #0369a1; }
-                    </style>
-                </head>
-                <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>⚡ High-Throughput Network Monitoring Service</h2>
-                        <span class="badge badge-up">System Online (Java 21 & Vert.x 5)</span>
-                    </div>
-                    <div class="cards">
-                        <div class="card"><div class="card-title">Health Status</div><div class="card-value" id="valHealth">UP</div></div>
-                        <div class="card"><div class="card-title">Registered Targets</div><div class="card-value" id="valTargets">0</div></div>
-                        <div class="card"><div class="card-title">Active Alerts</div><div class="card-value" id="valAlerts" style="color:#ef4444">0</div></div>
-                        <div class="card"><div class="card-title">Heap Memory</div><div class="card-value" id="valHeap">0 MB</div></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h3>Monitored Targets</h3>
-                        <button onclick="triggerBulkCheck()">⚡ Re-Check All Now</button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr><th>Target ID</th><th>Type</th><th>Endpoint</th><th>1m Avg (ms)</th><th>5m Avg (ms)</th><th>Status</th></tr>
-                        </thead>
-                        <tbody id="targetTableBody">
-                            <tr><td colspan="6" style="text-align:center; color:#64748b;">No targets registered yet. Use POST /api/targets or upload bulk targets.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <script>
-                    function fetchMetrics() {
-                        fetch('/api/metrics').then(r=>r.json()).then(d=>{
-                            document.getElementById('valHeap').innerText = d.heapUsedMb + ' / ' + d.heapMaxMb + ' MB';
-                        }).catch(()=>{});
-                        fetch('/api/targets').then(r=>r.json()).then(d=>{
-                            let targets = d.targets || [];
-                            document.getElementById('valTargets').innerText = targets.length;
-                            let tbody = document.getElementById('targetTableBody');
-                            if (targets.length === 0) return;
-                            tbody.innerHTML = targets.map(t => `
-                                <tr>
-                                    <td><b>${t.id}</b></td>
-                                    <td>${t.type || 'HTTP'}</td>
-                                    <td>${t.url || (t.ip + ':' + t.port)}</td>
-                                    <td>${t.avg1m ? t.avg1m.toFixed(2) : '-'}</td>
-                                    <td>${t.avg5m ? t.avg5m.toFixed(2) : '-'}</td>
-                                    <td><span class="badge badge-${(t.state||'HEALTHY').toLowerCase()}">${t.state || 'HEALTHY'}</span></td>
-                                </tr>
-                            `).join('');
-                        }).catch(()=>{});
-                        fetch('/api/alerts').then(r=>r.json()).then(d=>{
-                            let alerts = d.alerts || [];
-                            document.getElementById('valAlerts').innerText = alerts.length;
-                        }).catch(()=>{});
-                    }
-                    function triggerBulkCheck() {
-                        fetch('/api/targets/bulk-check', {method: 'POST'}).then(()=>alert('Bulk re-check triggered!'));
-                    }
-                    setInterval(fetchMetrics, 1000);
-                    fetchMetrics();
-                </script>
-                </body>
-                </html>
-                """;
-        ctx.response().putHeader("content-type", "text/html; charset=utf-8").end(html);
     }
 
     @Override

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Endpoint Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <h2>⚡ High-Throughput Network Monitoring Service</h2>
+        <span class="badge badge-up">System Online (Java 21 &amp; Vert.x 5)</span>
+    </header>
+
+    <section class="cards">
+        <div class="card">
+            <div class="card-title">Health Status</div>
+            <div class="card-value" id="valHealth">UP</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Registered Targets</div>
+            <div class="card-value" id="valTargets">0</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Active Alerts</div>
+            <div class="card-value" id="valAlerts" style="color:#ef4444">0</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Heap Memory</div>
+            <div class="card-value" id="valHeap">0 / 0 MB</div>
+        </div>
+    </section>
+
+    <div class="table-header-row">
+        <h3>Monitored Targets</h3>
+        <button class="btn" onclick="triggerBulkCheck()">⚡ Re-Check All Now</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Target ID</th>
+                <th>Type</th>
+                <th>Endpoint</th>
+                <th>1m Avg</th>
+                <th>5m Avg</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="targetTableBody">
+            <tr>
+                <td colspan="6" class="empty-state">No targets registered yet. Use POST /api/targets to add targets.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

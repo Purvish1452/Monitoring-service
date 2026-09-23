@@ -200,4 +200,27 @@ public class Slice1FoundationTest {
 
         vertx.eventBus().send(EventBusAddresses.CHECK_EXECUTE, targetConfig);
     }
+
+    @Test
+    @DisplayName("6. Verify decoupled static frontend dashboard assets are served properly")
+    void testStaticFrontendAssetsServed(VertxTestContext testContext) {
+        webClient.get(port, "127.0.0.1", "/")
+                .send()
+                .compose(response -> {
+                    assertEquals(200, response.statusCode());
+                    assertTrue(response.bodyAsString().contains("Network Endpoint Monitoring Dashboard"));
+                    return webClient.get(port, "127.0.0.1", "/css/style.css").send();
+                })
+                .compose(cssResp -> {
+                    assertEquals(200, cssResp.statusCode());
+                    assertTrue(cssResp.bodyAsString().contains(".badge"));
+                    return webClient.get(port, "127.0.0.1", "/js/app.js").send();
+                })
+                .onSuccess(jsResp -> testContext.verify(() -> {
+                    assertEquals(200, jsResp.statusCode());
+                    assertTrue(jsResp.bodyAsString().contains("fetchMetrics"));
+                    testContext.completeNow();
+                }))
+                .onFailure(testContext::failNow);
+    }
 }
