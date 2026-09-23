@@ -1,0 +1,245 @@
+{
+  "info": {
+    "_postman_id": "8f2d5a36-1e9c-4e89-b0d7-2f3493c12345",
+    "name": "High-Throughput Network Monitoring Service API",
+    "description": "Postman collection for testing the Java 21 + Vert.x 5 Non-blocking Network Endpoint Monitoring Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health & System Metrics",
+      "item": [
+        {
+          "name": "Health Check (< 50ms) [AC 2]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Ultra-fast health check answered directly from in-memory state in < 2ms without EventBus or DB roundtrips."
+          },
+          "response": []
+        },
+        {
+          "name": "System & Heap Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "metrics"]
+            },
+            "description": "Returns current JVM heap memory usage, total memory, max memory, and available processor cores."
+          },
+          "response": []
+        },
+        {
+          "name": "Web UI Dashboard HTML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Returns the embedded dark-mode real-time monitoring dashboard HTML."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Target Management",
+      "item": [
+        {
+          "name": "Register HTTP Target",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-http-google\",\n  \"type\": \"HTTP\",\n  \"url\": \"https://www.google.com\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"expectedStatusCode\": 200,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Registers a new HTTP target for automated scheduled monitoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Register TCP Target",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-tcp-dns\",\n  \"type\": \"TCP\",\n  \"ip\": \"8.8.8.8\",\n  \"port\": 53,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Registers a new raw TCP socket target for automated scheduled monitoring."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Bulk Targets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"id\": \"target-1\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/200\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-2\",\n    \"type\": \"TCP\",\n    \"ip\": \"1.1.1.1\",\n    \"port\": 53,\n    \"intervalSeconds\": 2,\n    \"timeoutMs\": 2000\n  }\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", "bulk"]
+            },
+            "description": "Bulk target upload supporting up to 5,000 targets."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Targets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Returns list of all monitored targets with their current health states and 1m/5m latency averages."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Target By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "target-http-google"
+                }
+              ]
+            },
+            "description": "Returns status, configuration, and rolling metrics for a specific target."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Target",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "target-http-google"
+                }
+              ]
+            },
+            "description": "Deletes target and deregisters it from scheduler and storage."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Probe Execution & Alerts",
+      "item": [
+        {
+          "name": "Trigger Immediate Check (Check Now)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/:id/check",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", ":id", "check"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "target-http-google"
+                }
+              ]
+            },
+            "description": "Forces an on-demand probe check for a target without waiting for next scheduled tick."
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Bulk Re-Check [AC 7]",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/bulk-check",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", "bulk-check"]
+            },
+            "description": "Triggers immediate re-check of all targets (AC 7: returns HTTP 202 immediately)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Active Alerts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Returns historical and active health state transition alerts (UP/DEGRADED/DOWN)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
