@@ -2,6 +2,8 @@ package com.monitoring;
 
 import com.monitoring.verticles.CheckManagerVerticle;
 import com.monitoring.verticles.HttpServerVerticle;
+import com.monitoring.verticles.TargetManagerVerticle;
+import com.monitoring.verticles.TargetSchedulerVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -43,8 +45,10 @@ public class MainLauncher {
         JsonObject config = loadConfiguration();
         DeploymentOptions deploymentOptions = new DeploymentOptions().setConfig(config);
 
-        // Approach B: Directly coordinate deployment of independent peer verticles
-        vertx.deployVerticle(new CheckManagerVerticle(), deploymentOptions)
+        // Deploy independent peer verticles in safe initialization order
+        vertx.deployVerticle(new TargetManagerVerticle(), deploymentOptions)
+                .compose(v -> vertx.deployVerticle(new TargetSchedulerVerticle(), deploymentOptions))
+                .compose(v -> vertx.deployVerticle(new CheckManagerVerticle(), deploymentOptions))
                 .compose(v -> vertx.deployVerticle(new HttpServerVerticle(), deploymentOptions))
                 .onSuccess(deploymentId -> {
                     logger.info("All monitoring service verticles deployed successfully.");
