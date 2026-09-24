@@ -68,8 +68,9 @@ public class CheckManagerVerticle extends AbstractVerticle {
 
     private void handleCheckRequest(JsonObject targetConfig) {
         String targetId = targetConfig.getString("id");
-        if (targetId == null) {
-            return;
+        if (targetId == null || targetId.isBlank()) {
+            targetId = "target-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+            targetConfig.put("id", targetId);
         }
 
         // Per-target running guard: prevent overlapping checks for the same target
