@@ -1,6 +1,7 @@
 package com.monitoring;
 
-import com.monitoring.verticles.MainVerticle;
+import com.monitoring.verticles.CheckManagerVerticle;
+import com.monitoring.verticles.HttpServerVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -15,9 +16,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Main application launcher.
+ * Main application launcher & Composition Root.
  * Configures Vert.x Event Loop Watchdog:
  * maxEventLoopExecuteTime = 100ms, blockedThreadCheckInterval = 500ms.
+ * Directly deploys independent Verticles in coordinated sequence.
  * Registers stateful SIGTERM shutdown hook.
  */
 public class MainLauncher {
@@ -41,9 +43,11 @@ public class MainLauncher {
         JsonObject config = loadConfiguration();
         DeploymentOptions deploymentOptions = new DeploymentOptions().setConfig(config);
 
-        vertx.deployVerticle(new MainVerticle(), deploymentOptions)
+        // Approach B: Directly coordinate deployment of independent peer verticles
+        vertx.deployVerticle(new CheckManagerVerticle(), deploymentOptions)
+                .compose(v -> vertx.deployVerticle(new HttpServerVerticle(), deploymentOptions))
                 .onSuccess(deploymentId -> {
-                    logger.info("Monitoring Service successfully started with deployment ID: {}", deploymentId);
+                    logger.info("All monitoring service verticles deployed successfully.");
                     registerShutdownHook(vertx);
                 })
                 .onFailure(err -> {
