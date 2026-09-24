@@ -88,8 +88,8 @@ public class HttpServerVerticle extends AbstractVerticle {
 
     private void handleRegisterTarget(RoutingContext ctx) {
         JsonObject body = ctx.body().asJsonObject();
-        if (body == null || !body.containsKey("id") || (!body.containsKey("url") && !body.containsKey("port"))) {
-            ctx.response().setStatusCode(400).end(new JsonObject().put("error", "Invalid target payload. Must include 'id' and either 'url' or 'port'").encode());
+        if (body == null || (!body.containsKey("url") && !body.containsKey("port"))) {
+            ctx.response().setStatusCode(400).end(new JsonObject().put("error", "Invalid target payload. Must include either 'url' (HTTP) or 'port' (TCP)").encode());
             return;
         }
 
