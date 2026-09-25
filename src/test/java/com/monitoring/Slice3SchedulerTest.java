@@ -1,10 +1,10 @@
 package com.monitoring;
 
 import com.monitoring.util.EventBusAddresses;
-import com.monitoring.verticles.CheckManagerVerticle;
-import com.monitoring.verticles.HttpServerVerticle;
-import com.monitoring.verticles.TargetManagerVerticle;
-import com.monitoring.verticles.TargetSchedulerVerticle;
+import com.monitoring.verticles.CheckManager;
+import com.monitoring.verticles.HttpServer;
+import com.monitoring.verticles.TargetManager;
+import com.monitoring.verticles.TargetScheduler;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
@@ -44,10 +44,10 @@ public class Slice3SchedulerTest {
 
         DeploymentOptions options = new DeploymentOptions().setConfig(config);
 
-        vertx.deployVerticle(new TargetManagerVerticle(), options)
-                .compose(v -> vertx.deployVerticle(new TargetSchedulerVerticle(), options))
-                .compose(v -> vertx.deployVerticle(new CheckManagerVerticle(), options))
-                .compose(v -> vertx.deployVerticle(new HttpServerVerticle(), options))
+        vertx.deployVerticle(new TargetManager(), options)
+                .compose(v -> vertx.deployVerticle(new TargetScheduler(), options))
+                .compose(v -> vertx.deployVerticle(new CheckManager(), options))
+                .compose(v -> vertx.deployVerticle(new HttpServer(), options))
                 .onComplete(testContext.succeedingThenComplete());
     }
 

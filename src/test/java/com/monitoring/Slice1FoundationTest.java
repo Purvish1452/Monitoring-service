@@ -1,8 +1,8 @@
 package com.monitoring;
 
 import com.monitoring.util.EventBusAddresses;
-import com.monitoring.verticles.CheckManagerVerticle;
-import com.monitoring.verticles.HttpServerVerticle;
+import com.monitoring.verticles.CheckManager;
+import com.monitoring.verticles.HttpServer;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -64,9 +64,9 @@ public class Slice1FoundationTest {
                 .listen(testTcpPort, "127.0.0.1")
                 .compose(server -> {
                     this.tcpEchoServer = server;
-                    return vertx.deployVerticle(new CheckManagerVerticle(), options);
+                    return vertx.deployVerticle(new CheckManager(), options);
                 })
-                .compose(v -> vertx.deployVerticle(new HttpServerVerticle(), options))
+                .compose(v -> vertx.deployVerticle(new HttpServer(), options))
                 .compose(v -> webClient.get(port, "127.0.0.1", "/health").send()) // Warmup JVM
                 .onComplete(testContext.succeedingThenComplete());
     }
