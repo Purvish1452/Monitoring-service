@@ -3,43 +3,30 @@ package com.monitoring.util;
 import io.vertx.core.json.JsonObject;
 
 /**
- * Utility for exact geometric exponential backoff calculation.
- * Ensures attempt start times match exact specification:
- * For base=200ms, factor=2.0, maxAttempts=3:
- * Attempt 1: 0ms
- * Attempt 2: 200ms
- * Attempt 3: 600ms
+ * Helper for calculating exponential retry delays.
  */
 public final class RetryHelper {
 
     private RetryHelper() {}
 
-    public static int getMaxAttempts(JsonObject retryPolicy) {
-        if (retryPolicy == null) return 3;
-        return retryPolicy.getInteger("maxAttempts", 3);
+    public static int getMaxAttempts(JsonObject policy) {
+        return policy != null ? policy.getInteger("maxAttempts", 3) : 3;
     }
 
-    public static long getBaseDelayMs(JsonObject retryPolicy) {
-        if (retryPolicy == null) return 200L;
-        return retryPolicy.getLong("baseDelayMs", 200L);
+    public static long getBaseDelayMs(JsonObject policy) {
+        return policy != null ? policy.getLong("baseDelayMs", 200L) : 200L;
     }
 
-    public static double getBackoffFactor(JsonObject retryPolicy) {
-        if (retryPolicy == null) return 2.0;
-        return retryPolicy.getDouble("backoffFactor", 2.0);
+    public static double getBackoffFactor(JsonObject policy) {
+        return policy != null ? policy.getDouble("backoffFactor", 2.0) : 2.0;
     }
 
-    /**
-     * Calculates delay before launching attempt number {@code nextAttemptNumber} (where nextAttemptNumber >= 2).
-     *
-     * @param nextAttemptNumber 2 for second attempt, 3 for third attempt, etc.
-     * @param retryPolicy configuration JsonObject
-     * @return delay in milliseconds
-     */
-    public static long calculateDelayMs(int nextAttemptNumber, JsonObject retryPolicy) {
-        if (nextAttemptNumber <= 1) return 0L;
-        long baseDelay = getBaseDelayMs(retryPolicy);
-        double factor = getBackoffFactor(retryPolicy);
-        return Math.round(baseDelay * Math.pow(factor, nextAttemptNumber - 2));
+    public static long calculateDelayMs(int attempt, JsonObject policy) {
+        if (attempt <= 1) {
+            return 0L;
+        }
+        long baseDelay = getBaseDelayMs(policy);
+        double factor = getBackoffFactor(policy);
+        return Math.round(baseDelay * Math.pow(factor, attempt - 2));
     }
 }
