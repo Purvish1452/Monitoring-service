@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8f2d5a36-1e9c-4e89-b0d7-2f3493c12345",
     "name": "High-Throughput Network Monitoring Service API",
-    "description": "Postman collection for testing the Java 21 + Vert.x 5 Non-blocking Network Endpoint Monitoring Service.",
+    "description": "Comprehensive Postman collection for testing the Java 21 + Eclipse Vert.x 5.0.0 High-Throughput Network Monitoring Service.\n\nKey Capabilities Tested:\n- AC 2: Ultra-fast /health (< 50ms)\n- Single Target Registration (with custom ID & auto-generated UUID)\n- Bulk Target Ingestion (up to 5,000 targets, HTTP 202 Accepted)\n- AC 7: Bulk Parallel Re-Check (HTTP 202 Accepted)\n- On-Demand Target Probing & State Queries",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -26,7 +26,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["health"]
             },
-            "description": "Ultra-fast health check answered directly from in-memory state in < 2ms without EventBus or DB roundtrips."
+            "description": "Ultra-fast health check answered directly from in-memory state in < 2ms without EventBus or DB roundtrips (Satisfies AC 2)."
           },
           "response": []
         },
@@ -40,7 +40,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "metrics"]
             },
-            "description": "Returns current JVM heap memory usage, total memory, max memory, and available processor cores."
+            "description": "Returns current JVM heap memory usage, total memory, max memory (-Xmx1g), and available processor cores."
           },
           "response": []
         },
@@ -54,17 +54,17 @@
               "host": ["{{baseUrl}}"],
               "path": [""]
             },
-            "description": "Returns the embedded dark-mode real-time monitoring dashboard HTML."
+            "description": "Returns the decoupled real-time dark-mode monitoring dashboard HTML served via StaticHandler."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "2. Target Management",
+      "name": "2. Target Management (Single)",
       "item": [
         {
-          "name": "Register HTTP Target",
+          "name": "Register HTTP Target (With Custom ID)",
           "request": {
             "method": "POST",
             "header": [
@@ -82,12 +82,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Registers a new HTTP target for automated scheduled monitoring."
+            "description": "Registers a new HTTP target with a user-supplied custom ID ('target-http-google')."
           },
           "response": []
         },
         {
-          "name": "Register TCP Target",
+          "name": "Register HTTP Target (Without ID - Auto-Generated UUID)",
           "request": {
             "method": "POST",
             "header": [
@@ -98,19 +98,19 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"target-tcp-dns\",\n  \"type\": \"TCP\",\n  \"ip\": \"8.8.8.8\",\n  \"port\": 53,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
+              "raw": "{\n  \"type\": \"HTTP\",\n  \"url\": \"https://cloudflare.com\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"expectedStatusCode\": 200,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/targets",
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Registers a new raw TCP socket target for automated scheduled monitoring."
+            "description": "Registers a target WITHOUT supplying an 'id'. The service automatically assigns a unique ID: 'target-<8-char-UUID>' (e.g. target-a8f3b29c)."
           },
           "response": []
         },
         {
-          "name": "Register Bulk Targets",
+          "name": "Register TCP Target (With Custom ID)",
           "request": {
             "method": "POST",
             "header": [
@@ -121,14 +121,37 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"target-1\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/200\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-2\",\n    \"type\": \"TCP\",\n    \"ip\": \"1.1.1.1\",\n    \"port\": 53,\n    \"intervalSeconds\": 2,\n    \"timeoutMs\": 2000\n  }\n]"
+              "raw": "{\n  \"id\": \"target-tcp-dns-google\",\n  \"type\": \"TCP\",\n  \"ip\": \"8.8.8.8\",\n  \"port\": 53,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/targets/bulk",
+              "raw": "{{baseUrl}}/api/targets",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "targets", "bulk"]
+              "path": ["api", "targets"]
             },
-            "description": "Bulk target upload supporting up to 5,000 targets."
+            "description": "Registers a raw TCP socket target probing port 53 (DNS) with a custom ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Register TCP Target (Without ID - Auto-Generated UUID)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"TCP\",\n  \"ip\": \"1.1.1.1\",\n  \"port\": 53,\n  \"intervalSeconds\": 2,\n  \"timeoutMs\": 1500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Registers a raw TCP socket target without an ID. The code auto-generates a unique UUID ID."
           },
           "response": []
         },
@@ -142,7 +165,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Returns list of all monitored targets with their current health states and 1m/5m latency averages."
+            "description": "Returns the complete array of all monitored targets with their current configuration and rolling latency averages."
           },
           "response": []
         },
@@ -162,7 +185,7 @@
                 }
               ]
             },
-            "description": "Returns status, configuration, and rolling metrics for a specific target."
+            "description": "Retrieves configuration and telemetry for a specific target by ID."
           },
           "response": []
         },
@@ -182,14 +205,56 @@
                 }
               ]
             },
-            "description": "Deletes target and deregisters it from scheduler and storage."
+            "description": "Deletes target from memory and cancels all future scheduled checks instantly."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "3. Probe Execution & Alerts",
+      "name": "3. Bulk Operations (High-Throughput)",
+      "item": [
+        {
+          "name": "Register Bulk Targets (Mixed HTTP/TCP & Auto-IDs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"id\": \"bulk-http-1\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/200\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/delay/1\",\n    \"intervalSeconds\": 2,\n    \"timeoutMs\": 3000\n  },\n  {\n    \"id\": \"bulk-tcp-cloudflare\",\n    \"type\": \"TCP\",\n    \"ip\": \"1.1.1.1\",\n    \"port\": 53,\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"type\": \"TCP\",\n    \"ip\": \"8.8.4.4\",\n    \"port\": 53,\n    \"intervalSeconds\": 5,\n    \"timeoutMs\": 2000\n  }\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", "bulk"]
+            },
+            "description": "Demonstrates high-throughput bulk ingestion. Targets without IDs are automatically assigned UUIDs. Returns HTTP 202 Accepted immediately."
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Bulk Re-Check [AC 7]",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/targets/bulk-check",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets", "bulk-check"]
+            },
+            "description": "Triggers immediate parallel re-check across all registered targets (AC 7: returns HTTP 202 immediately and dispatches parallel checks within bounded concurrency)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. On-Demand Probes & Alerts",
       "item": [
         {
           "name": "Trigger Immediate Check (Check Now)",
@@ -207,21 +272,7 @@
                 }
               ]
             },
-            "description": "Forces an on-demand probe check for a target without waiting for next scheduled tick."
-          },
-          "response": []
-        },
-        {
-          "name": "Trigger Bulk Re-Check [AC 7]",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/targets/bulk-check",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "targets", "bulk-check"]
-            },
-            "description": "Triggers immediate re-check of all targets (AC 7: returns HTTP 202 immediately)."
+            "description": "Forces an on-demand probe check for a target without waiting for its scheduled tick."
           },
           "response": []
         },

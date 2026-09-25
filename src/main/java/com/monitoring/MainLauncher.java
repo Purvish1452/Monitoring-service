@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Main application launcher & Composition Root.
  * Configures Vert.x Event Loop Watchdog:
  * maxEventLoopExecuteTime = 100ms, blockedThreadCheckInterval = 500ms.
- * Directly deploys independent Verticles in coordinated sequence.
+ * Directly deploys independent Verticles in coordinated sequence with multi-instance scaling.
  * Registers stateful SIGTERM shutdown hook.
  */
 public class MainLauncher {
@@ -43,15 +43,23 @@ public class MainLauncher {
         Vertx vertx = Vertx.vertx(options);
 
         JsonObject config = loadConfiguration();
-        DeploymentOptions deploymentOptions = new DeploymentOptions().setConfig(config);
+        JsonObject deployConfig = config.getJsonObject("deployment", new JsonObject());
 
-        // Deploy independent peer verticles in safe initialization order
-        vertx.deployVerticle(new TargetManagerVerticle(), deploymentOptions)
-                .compose(v -> vertx.deployVerticle(new TargetSchedulerVerticle(), deploymentOptions))
-                .compose(v -> vertx.deployVerticle(new CheckManagerVerticle(), deploymentOptions))
-                .compose(v -> vertx.deployVerticle(new HttpServerVerticle(), deploymentOptions))
+        int httpInstances = deployConfig.getInteger("httpServerInstances", 2);
+        int checkInstances = deployConfig.getInteger("checkManagerInstances", 2);
+
+        DeploymentOptions singletonOptions = new DeploymentOptions().setConfig(config).setInstances(1);
+        DeploymentOptions httpOptions = new DeploymentOptions().setConfig(config).setInstances(httpInstances);
+        DeploymentOptions checkOptions = new DeploymentOptions().setConfig(config).setInstances(checkInstances);
+
+        // Deploy independent peer verticles in safe initialization order with multi-instance scaling
+        vertx.deployVerticle(TargetManagerVerticle::new, singletonOptions)
+                .compose(v -> vertx.deployVerticle(TargetSchedulerVerticle::new, singletonOptions))
+                .compose(v -> vertx.deployVerticle(CheckManagerVerticle::new, checkOptions))
+                .compose(v -> vertx.deployVerticle(HttpServerVerticle::new, httpOptions))
                 .onSuccess(deploymentId -> {
-                    logger.info("All monitoring service verticles deployed successfully.");
+                    logger.info("All monitoring service verticles deployed successfully (HTTP instances: {}, CheckManager instances: {}).",
+                            httpInstances, checkInstances);
                     registerShutdownHook(vertx);
                 })
                 .onFailure(err -> {

@@ -194,11 +194,11 @@ public class CheckManagerVerticle extends AbstractVerticle {
                 .put("statusCode", statusCode)
                 .put("errorMessage", errorMessage);
 
-        // 1. Emit check result for Stats, Alerts, and Persistence
-        vertx.eventBus().send(EventBusAddresses.CHECK_RESULT, checkResult);
+        // 1. Emit check result for Stats, Alerts, and Persistence (Publish-Subscribe)
+        vertx.eventBus().publish(EventBusAddresses.CHECK_RESULT, checkResult);
 
         // 2. Notify Scheduler that this target's check is completed (for interval coalescing)
-        vertx.eventBus().send(EventBusAddresses.CHECK_COMPLETED, new JsonObject().put("targetId", targetId));
+        vertx.eventBus().publish(EventBusAddresses.CHECK_COMPLETED, new JsonObject().put("targetId", targetId));
 
         // 3. Release slot and process next queued check
         runningTargets.remove(targetId);

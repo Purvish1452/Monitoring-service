@@ -5,3 +5,5 @@ target/
 *.log
 *.class
 .DS_Store
+cp.txt
+classpath.txt
