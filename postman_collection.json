@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8f2d5a36-1e9c-4e89-b0d7-2f3493c12345",
     "name": "High-Throughput Network Monitoring Service API",
-    "description": "Comprehensive Postman collection for testing the Java 21 + Eclipse Vert.x 5.0.0 High-Throughput Network Monitoring Service.\n\nKey Capabilities Tested:\n- AC 2: Ultra-fast /health (< 50ms)\n- Single Target Registration (with custom ID & auto-generated UUID)\n- Bulk Target Ingestion (up to 5,000 targets, HTTP 202 Accepted)\n- AC 7: Bulk Parallel Re-Check (HTTP 202 Accepted)\n- On-Demand Target Probing & State Queries",
+    "description": "Comprehensive Postman collection for testing the Java 21 + Eclipse Vert.x 5.0.0 High-Throughput Network Monitoring Service.\n\nIncludes endpoints for Healthy, Degraded, HTTP 500, HTTP 404, TCP Connection Refused, and Timeout states.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -64,7 +64,7 @@
       "name": "2. Target Management (Single)",
       "item": [
         {
-          "name": "Register HTTP Target (With Custom ID)",
+          "name": "Register HTTP Target (Healthy - Google)",
           "request": {
             "method": "POST",
             "header": [
@@ -82,12 +82,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Registers a new HTTP target with a user-supplied custom ID ('target-http-google')."
+            "description": "Registers a healthy HTTP target with a custom ID."
           },
           "response": []
         },
         {
-          "name": "Register HTTP Target (Without ID - Auto-Generated UUID)",
+          "name": "Register HTTP Target (Without ID - Auto UUID)",
           "request": {
             "method": "POST",
             "header": [
@@ -98,19 +98,19 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"HTTP\",\n  \"url\": \"https://cloudflare.com\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"expectedStatusCode\": 200,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
+              "raw": "{\n  \"type\": \"HTTP\",\n  \"url\": \"https://cloudflare.com\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/targets",
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Registers a target WITHOUT supplying an 'id'. The service automatically assigns a unique ID: 'target-<8-char-UUID>' (e.g. target-a8f3b29c)."
+            "description": "Registers a target WITHOUT supplying an 'id'. The service auto-generates 'target-<UUID>'."
           },
           "response": []
         },
         {
-          "name": "Register TCP Target (With Custom ID)",
+          "name": "Register TCP Target (Healthy - Cloudflare DNS)",
           "request": {
             "method": "POST",
             "header": [
@@ -121,37 +121,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"target-tcp-dns-google\",\n  \"type\": \"TCP\",\n  \"ip\": \"8.8.8.8\",\n  \"port\": 53,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 200,\n    \"backoffFactor\": 2.0\n  }\n}"
+              "raw": "{\n  \"id\": \"target-tcp-dns-cf\",\n  \"type\": \"TCP\",\n  \"ip\": \"1.1.1.1\",\n  \"port\": 53,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/targets",
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Registers a raw TCP socket target probing port 53 (DNS) with a custom ID."
-          },
-          "response": []
-        },
-        {
-          "name": "Register TCP Target (Without ID - Auto-Generated UUID)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"type\": \"TCP\",\n  \"ip\": \"1.1.1.1\",\n  \"port\": 53,\n  \"intervalSeconds\": 2,\n  \"timeoutMs\": 1500\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/targets",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "targets"]
-            },
-            "description": "Registers a raw TCP socket target without an ID. The code auto-generates a unique UUID ID."
+            "description": "Registers a raw TCP socket target probing port 53 (DNS)."
           },
           "response": []
         },
@@ -165,7 +142,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets"]
             },
-            "description": "Returns the complete array of all monitored targets with their current configuration and rolling latency averages."
+            "description": "Returns all registered targets."
           },
           "response": []
         },
@@ -185,7 +162,7 @@
                 }
               ]
             },
-            "description": "Retrieves configuration and telemetry for a specific target by ID."
+            "description": "Retrieves configuration for a specific target by ID."
           },
           "response": []
         },
@@ -205,17 +182,17 @@
                 }
               ]
             },
-            "description": "Deletes target from memory and cancels all future scheduled checks instantly."
+            "description": "Deletes target and cancels all future scheduled checks."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "3. Bulk Operations (High-Throughput)",
+      "name": "3. Testing Different Target Statuses (Failing, Degraded, Timeout)",
       "item": [
         {
-          "name": "Register Bulk Targets (Mixed HTTP/TCP & Auto-IDs)",
+          "name": "Register Failing Target (HTTP 500 Internal Server Error)",
           "request": {
             "method": "POST",
             "header": [
@@ -226,14 +203,134 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"bulk-http-1\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/200\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/delay/1\",\n    \"intervalSeconds\": 2,\n    \"timeoutMs\": 3000\n  },\n  {\n    \"id\": \"bulk-tcp-cloudflare\",\n    \"type\": \"TCP\",\n    \"ip\": \"1.1.1.1\",\n    \"port\": 53,\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"type\": \"TCP\",\n    \"ip\": \"8.8.4.4\",\n    \"port\": 53,\n    \"intervalSeconds\": 5,\n    \"timeoutMs\": 2000\n  }\n]"
+              "raw": "{\n  \"id\": \"target-failing-500\",\n  \"type\": \"HTTP\",\n  \"url\": \"https://httpbin.org/status/500\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"expectedStatusCode\": 200,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 100,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Probes an endpoint that always returns HTTP 500 Error, triggering failure and retries."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Failing Target (HTTP 404 Not Found)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-failing-404\",\n  \"type\": \"HTTP\",\n  \"url\": \"https://httpbin.org/status/404\",\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 2000,\n  \"expectedStatusCode\": 200,\n  \"retryPolicy\": {\n    \"maxAttempts\": 3,\n    \"baseDelayMs\": 100,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Probes an endpoint that always returns HTTP 404 Not Found."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Failing Target (TCP Connection Refused - Closed Port)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-tcp-closed-port\",\n  \"type\": \"TCP\",\n  \"ip\": \"127.0.0.1\",\n  \"port\": 59998,\n  \"intervalSeconds\": 1,\n  \"timeoutMs\": 1000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 2,\n    \"baseDelayMs\": 50,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Probes a closed local TCP port, triggering Connection Refused errors."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Degraded Target (Slow 2s Latency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-slow-degraded-2s\",\n  \"type\": \"HTTP\",\n  \"url\": \"https://httpbin.org/delay/2\",\n  \"intervalSeconds\": 3,\n  \"timeoutMs\": 4000,\n  \"expectedStatusCode\": 200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Probes an endpoint with artificial 2.0-second response latency (Slow / Degraded)."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Timeout Target (Non-Routable Blackhole)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"target-timeout-blackhole\",\n  \"type\": \"HTTP\",\n  \"url\": \"http://10.255.255.1/blackhole\",\n  \"intervalSeconds\": 2,\n  \"timeoutMs\": 1000,\n  \"retryPolicy\": {\n    \"maxAttempts\": 2,\n    \"baseDelayMs\": 50,\n    \"backoffFactor\": 2.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/targets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "targets"]
+            },
+            "description": "Probes a non-routable IP address to verify strict timeout enforcement (AC 3)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Bulk Operations (High-Throughput)",
+      "item": [
+        {
+          "name": "Register Bulk Targets (Mixed Statuses - Healthy, 500, 404, Slow, TCP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"id\": \"target-google-ok\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://www.google.com\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-error-500\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/500\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-error-404\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/status/404\",\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-slow-2s\",\n    \"type\": \"HTTP\",\n    \"url\": \"https://httpbin.org/delay/2\",\n    \"intervalSeconds\": 3,\n    \"timeoutMs\": 4000\n  },\n  {\n    \"id\": \"target-tcp-dns-ok\",\n    \"type\": \"TCP\",\n    \"ip\": \"8.8.8.8\",\n    \"port\": 53,\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 2000\n  },\n  {\n    \"id\": \"target-tcp-closed-fail\",\n    \"type\": \"TCP\",\n    \"ip\": \"127.0.0.1\",\n    \"port\": 59998,\n    \"intervalSeconds\": 1,\n    \"timeoutMs\": 1000\n  }\n]"
             },
             "url": {
               "raw": "{{baseUrl}}/api/targets/bulk",
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets", "bulk"]
             },
-            "description": "Demonstrates high-throughput bulk ingestion. Targets without IDs are automatically assigned UUIDs. Returns HTTP 202 Accepted immediately."
+            "description": "Registers a mix of healthy, failing (500/404), slow, and closed-port targets simultaneously."
           },
           "response": []
         },
@@ -247,14 +344,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "targets", "bulk-check"]
             },
-            "description": "Triggers immediate parallel re-check across all registered targets (AC 7: returns HTTP 202 immediately and dispatches parallel checks within bounded concurrency)."
+            "description": "Triggers immediate parallel re-check across all registered targets (AC 7: returns HTTP 202 immediately)."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "4. On-Demand Probes & Alerts",
+      "name": "5. On-Demand Probes & Alerts",
       "item": [
         {
           "name": "Trigger Immediate Check (Check Now)",
