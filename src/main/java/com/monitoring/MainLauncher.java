@@ -7,7 +7,6 @@ import com.monitoring.verticles.StatsManager;
 import com.monitoring.verticles.TargetManager;
 import com.monitoring.verticles.TargetScheduler;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.ThreadingModel;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.json.JsonObject;
@@ -35,13 +34,12 @@ public class MainLauncher {
 
         Vertx vertx = Vertx.vertx(options);
 
-        DeploymentOptions workerOpts = new DeploymentOptions().setConfig(config).setThreadingModel(ThreadingModel.WORKER);
         DeploymentOptions baseOpts = new DeploymentOptions().setConfig(config);
         DeploymentOptions checkOpts = new DeploymentOptions().setConfig(config).setInstances(checkInstances);
         DeploymentOptions httpOpts = new DeploymentOptions().setConfig(config).setInstances(httpInstances);
 
         // Start verticles in order
-        vertx.deployVerticle(PersistenceWorker::new, workerOpts)
+        vertx.deployVerticle(PersistenceWorker::new, baseOpts)
                 .compose(v -> vertx.deployVerticle(TargetManager::new, baseOpts))
                 .compose(v -> vertx.deployVerticle(TargetScheduler::new, baseOpts))
                 .compose(v -> vertx.deployVerticle(StatsManager::new, baseOpts))

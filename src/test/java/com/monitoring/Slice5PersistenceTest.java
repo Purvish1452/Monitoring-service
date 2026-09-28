@@ -8,7 +8,6 @@ import com.monitoring.verticles.StatsManager;
 import com.monitoring.verticles.TargetManager;
 import com.monitoring.verticles.TargetScheduler;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.ThreadingModel;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
@@ -58,10 +57,9 @@ public class Slice5PersistenceTest {
                         .put("flushIntervalMs", 200L)
                         .put("bufferCapacity", 5));
 
-        DeploymentOptions workerOpts = new DeploymentOptions().setConfig(config).setThreadingModel(ThreadingModel.WORKER);
         DeploymentOptions baseOpts = new DeploymentOptions().setConfig(config);
 
-        vertx.deployVerticle(new PersistenceWorker(), workerOpts)
+        vertx.deployVerticle(new PersistenceWorker(), baseOpts)
                 .compose(v -> vertx.deployVerticle(new TargetManager(), baseOpts))
                 .compose(v -> vertx.deployVerticle(new TargetScheduler(), baseOpts))
                 .compose(v -> vertx.deployVerticle(new StatsManager(), baseOpts))

@@ -123,12 +123,12 @@ public class PersistenceWorker extends AbstractVerticle {
     }
 
     private void writeTargetsToDisk() {
-        JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
-        String payload = new JsonObject().put("targets", array).encodePrettily();
-
         executor.executeBlocking(() -> {
             synchronized (targetFileLock) {
                 try {
+                    JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
+                    String payload = new JsonObject().put("targets", array).encodePrettily();
+
                     Path path = Path.of(targetsFilePath);
                     if (path.getParent() != null) {
                         Files.createDirectories(path.getParent());
