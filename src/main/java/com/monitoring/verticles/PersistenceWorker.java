@@ -3,6 +3,7 @@ package com.monitoring.verticles;
 import com.monitoring.util.EventBusAddresses;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.WorkerExecutor;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -13,12 +14,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Worker verticle handling disk persistence for targets and buffered audit logs.
+ * Uses a dedicated 5-thread WorkerExecutor for isolated disk I/O.
  */
 public class PersistenceWorker extends AbstractVerticle {
 
@@ -28,9 +31,18 @@ public class PersistenceWorker extends AbstractVerticle {
     private String auditLogFilePath = "data/audit.jsonl";
     private long flushIntervalMs = 1000L;
     private int bufferCapacity = 100;
+    private int poolSize = 5;
 
-    private final Map<String, JsonObject> persistedTargets = new HashMap<>();
-    private final List<JsonObject> auditBuffer = new ArrayList<>();
+    // Thread-safe concurrent data structures
+    private final ConcurrentHashMap<String, JsonObject> persistedTargets = new ConcurrentHashMap<>();
+    private final ConcurrentLinkedQueue<JsonObject> auditBuffer = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger bufferSize = new AtomicInteger(0);
+
+    // Dedicated file locks for synchronized disk operations
+    private final Object targetFileLock = new Object();
+    private final Object auditFileLock = new Object();
+
+    private WorkerExecutor executor;
     private long timerId = -1L;
 
     @Override
@@ -40,18 +52,25 @@ public class PersistenceWorker extends AbstractVerticle {
         this.auditLogFilePath = config.getString("auditLogFilePath", "data/audit.jsonl");
         this.flushIntervalMs = config.getLong("flushIntervalMs", 1000L);
         this.bufferCapacity = config.getInteger("bufferCapacity", 100);
+        this.poolSize = config.getInteger("poolSize", 5);
 
-        loadTargetsFromDisk();
+        // Dedicated 5-thread worker executor for persistence
+        this.executor = vertx.createSharedWorkerExecutor("persistence-worker-pool", poolSize);
 
-        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_SAVE, msg -> handleSaveTarget(msg.body()));
-        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_DELETE, msg -> handleDeleteTarget(msg.body()));
-        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_LOAD, this::handleLoadTargets);
-        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.AUDIT_LOG, msg -> handleAuditLog(msg.body()));
+        executor.executeBlocking(() -> {
+            loadTargetsFromDisk();
+            return null;
+        }).onComplete(ar -> {
+            vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_SAVE, msg -> handleSaveTarget(msg.body()));
+            vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_DELETE, msg -> handleDeleteTarget(msg.body()));
+            vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.PERSIST_TARGET_LOAD, this::handleLoadTargets);
+            vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.AUDIT_LOG, msg -> handleAuditLog(msg.body()));
 
-        timerId = vertx.setPeriodic(flushIntervalMs, id -> flushAuditBuffer());
+            timerId = vertx.setPeriodic(flushIntervalMs, id -> flushAuditBuffer());
 
-        log.info("PersistenceWorker started (targets: {}, audit: {})", targetsFilePath, auditLogFilePath);
-        startPromise.complete();
+            log.info("PersistenceWorker started (targets: {}, audit: {}, poolSize: {})", targetsFilePath, auditLogFilePath, poolSize);
+            startPromise.complete();
+        });
     }
 
     private void handleSaveTarget(JsonObject target) {
@@ -76,66 +95,85 @@ public class PersistenceWorker extends AbstractVerticle {
 
     private void handleAuditLog(JsonObject entry) {
         if (entry == null) return;
-        auditBuffer.add(entry);
-        if (auditBuffer.size() >= bufferCapacity) {
+        auditBuffer.offer(entry);
+        if (bufferSize.incrementAndGet() >= bufferCapacity) {
             flushAuditBuffer();
         }
     }
 
     private void loadTargetsFromDisk() {
-        Path path = Path.of(targetsFilePath);
-        if (!Files.exists(path)) return;
+        synchronized (targetFileLock) {
+            Path path = Path.of(targetsFilePath);
+            if (!Files.exists(path)) return;
 
-        try {
-            String content = Files.readString(path);
-            if (!content.isBlank()) {
-                JsonArray array = new JsonObject(content).getJsonArray("targets", new JsonArray());
-                for (int i = 0; i < array.size(); i++) {
-                    JsonObject target = array.getJsonObject(i);
-                    persistedTargets.put(target.getString("id"), target);
+            try {
+                String content = Files.readString(path);
+                if (!content.isBlank()) {
+                    JsonArray array = new JsonObject(content).getJsonArray("targets", new JsonArray());
+                    for (int i = 0; i < array.size(); i++) {
+                        JsonObject target = array.getJsonObject(i);
+                        persistedTargets.put(target.getString("id"), target);
+                    }
+                    log.info("Loaded {} targets from {}", persistedTargets.size(), targetsFilePath);
                 }
-                log.info("Loaded {} targets from {}", persistedTargets.size(), targetsFilePath);
+            } catch (Exception e) {
+                log.warn("Could not load {}: {}", targetsFilePath, e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Could not load {}: {}", targetsFilePath, e.getMessage());
         }
     }
 
     private void writeTargetsToDisk() {
-        try {
-            Path path = Path.of(targetsFilePath);
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
+        JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
+        String payload = new JsonObject().put("targets", array).encodePrettily();
+
+        executor.executeBlocking(() -> {
+            synchronized (targetFileLock) {
+                try {
+                    Path path = Path.of(targetsFilePath);
+                    if (path.getParent() != null) {
+                        Files.createDirectories(path.getParent());
+                    }
+                    Files.writeString(path, payload);
+                } catch (Exception e) {
+                    log.error("Failed to write to {}: {}", targetsFilePath, e.getMessage());
+                }
             }
-            JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
-            JsonObject json = new JsonObject().put("targets", array);
-            Files.writeString(path, json.encodePrettily());
-        } catch (Exception e) {
-            log.error("Failed to write to {}: {}", targetsFilePath, e.getMessage());
-        }
+            return null;
+        });
     }
 
     private void flushAuditBuffer() {
         if (auditBuffer.isEmpty()) return;
 
-        List<JsonObject> batch = new ArrayList<>(auditBuffer);
-        auditBuffer.clear();
-
-        try {
-            Path path = Path.of(auditLogFilePath);
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
-            }
-
-            StringBuilder sb = new StringBuilder();
-            for (JsonObject entry : batch) {
-                sb.append(entry.encode()).append('\n');
-            }
-
-            Files.writeString(path, sb.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (Exception e) {
-            log.error("Failed to flush audit logs to {}: {}", auditLogFilePath, e.getMessage());
+        List<JsonObject> batch = new ArrayList<>();
+        JsonObject entry;
+        while ((entry = auditBuffer.poll()) != null) {
+            batch.add(entry);
+            bufferSize.decrementAndGet();
         }
+
+        if (batch.isEmpty()) return;
+
+        StringBuilder sb = new StringBuilder();
+        for (JsonObject logEntry : batch) {
+            sb.append(logEntry.encode()).append('\n');
+        }
+        String logsToWrite = sb.toString();
+
+        executor.executeBlocking(() -> {
+            synchronized (auditFileLock) {
+                try {
+                    Path path = Path.of(auditLogFilePath);
+                    if (path.getParent() != null) {
+                        Files.createDirectories(path.getParent());
+                    }
+                    Files.writeString(path, logsToWrite, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                } catch (Exception e) {
+                    log.error("Failed to flush audit logs to {}: {}", auditLogFilePath, e.getMessage());
+                }
+            }
+            return null;
+        });
     }
 
     @Override
@@ -144,6 +182,10 @@ public class PersistenceWorker extends AbstractVerticle {
             vertx.cancelTimer(timerId);
         }
         flushAuditBuffer();
-        stopPromise.complete();
+        if (executor != null) {
+            executor.close().onComplete(ar -> stopPromise.complete());
+        } else {
+            stopPromise.complete();
+        }
     }
 }

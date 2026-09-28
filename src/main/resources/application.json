@@ -20,7 +20,8 @@
     "targetsFilePath": "data/targets.json",
     "auditLogFilePath": "data/audit.jsonl",
     "flushIntervalMs": 1000,
-    "bufferCapacity": 100
+    "bufferCapacity": 100,
+    "poolSize": 5
   },
   "mock": {
     "enabled": true,

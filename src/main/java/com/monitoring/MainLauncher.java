@@ -23,6 +23,10 @@ public class MainLauncher {
     private static final Logger log = LoggerFactory.getLogger(MainLauncher.class);
 
     public static void main(String[] args) {
+        JsonObject config = loadConfig();
+        int httpInstances = config.getJsonObject("deployment", new JsonObject()).getInteger("httpServerInstances", 2);
+        int checkInstances = config.getJsonObject("deployment", new JsonObject()).getInteger("checkManagerInstances", 2);
+
         VertxOptions options = new VertxOptions()
                 .setMaxEventLoopExecuteTime(100)
                 .setMaxEventLoopExecuteTimeUnit(TimeUnit.MILLISECONDS)
@@ -30,10 +34,6 @@ public class MainLauncher {
                 .setBlockedThreadCheckIntervalUnit(TimeUnit.MILLISECONDS);
 
         Vertx vertx = Vertx.vertx(options);
-        JsonObject config = loadConfig();
-
-        int httpInstances = config.getJsonObject("deployment", new JsonObject()).getInteger("httpServerInstances", 2);
-        int checkInstances = config.getJsonObject("deployment", new JsonObject()).getInteger("checkManagerInstances", 2);
 
         DeploymentOptions workerOpts = new DeploymentOptions().setConfig(config).setThreadingModel(ThreadingModel.WORKER);
         DeploymentOptions baseOpts = new DeploymentOptions().setConfig(config);
