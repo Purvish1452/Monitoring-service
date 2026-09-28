@@ -49,7 +49,7 @@ public class CheckManager extends AbstractVerticle {
 
         netClient = vertx.createNetClient(new NetClientOptions().setConnectTimeout(5000));
 
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.CHECK_EXECUTE, msg -> handleCheckRequest(msg.body()));
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.CHECK_EXECUTE, msg -> handleCheckRequest(msg.body()));
 
         log.info("CheckManager started with maxConcurrentChecks={}", maxConcurrentChecks);
         startPromise.complete();

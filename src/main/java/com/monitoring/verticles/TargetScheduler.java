@@ -9,9 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Schedules periodic target health checks using a priority queue and a single tick timer.
@@ -23,7 +23,7 @@ public class TargetScheduler extends AbstractVerticle {
     private record Task(String id, JsonObject config, long nextRun, long intervalMs, long version) {}
 
     private final PriorityQueue<Task> queue = new PriorityQueue<>(Comparator.comparingLong(Task::nextRun));
-    private final Map<String, Long> activeVersions = new ConcurrentHashMap<>();
+    private final Map<String, Long> activeVersions = new HashMap<>();
 
     private long timerId = -1L;
     private int tickIntervalMs = 20;
@@ -35,9 +35,9 @@ public class TargetScheduler extends AbstractVerticle {
         JsonObject config = config().getJsonObject("monitoring", new JsonObject());
         tickIntervalMs = config.getInteger("tickIntervalMs", 20);
 
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.SCHEDULER_TARGET_ADD, this::handleAdd);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.SCHEDULER_TARGET_REMOVE, this::handleRemove);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.SCHEDULER_PAUSE, this::handlePause);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.SCHEDULER_TARGET_ADD, this::handleAdd);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.SCHEDULER_TARGET_REMOVE, this::handleRemove);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.SCHEDULER_PAUSE, this::handlePause);
 
         timerId = vertx.setPeriodic(tickIntervalMs, id -> onTick());
 

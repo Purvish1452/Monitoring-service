@@ -18,7 +18,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,7 +35,7 @@ public class Slice1FoundationTest {
     private final int testTcpPort = 19001;
     private NetServer tcpEchoServer;
 
-    private final Map<String, Consumer<JsonObject>> resultListeners = new ConcurrentHashMap<>();
+    private final Map<String, Consumer<JsonObject>> resultListeners = new HashMap<>();
 
     @BeforeAll
     void setUp(VertxTestContext testContext) {
@@ -48,8 +48,8 @@ public class Slice1FoundationTest {
 
         DeploymentOptions options = new DeploymentOptions().setConfig(config);
 
-        // Single EventBus consumer that routes results to the registered listener for that targetId
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.CHECK_RESULT, msg -> {
+        // Single EventBus localConsumer that routes results to the registered listener for that targetId
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.CHECK_RESULT, msg -> {
             JsonObject result = msg.body();
             String targetId = result.getString("targetId");
             Consumer<JsonObject> listener = resultListeners.remove(targetId);

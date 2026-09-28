@@ -9,9 +9,9 @@ import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory registry for monitored targets.
@@ -20,16 +20,35 @@ public class TargetManager extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(TargetManager.class);
 
-    private final Map<String, JsonObject> targets = new ConcurrentHashMap<>();
+    private final Map<String, JsonObject> targets = new HashMap<>();
 
     @Override
     public void start(Promise<Void> startPromise) {
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.TARGET_REGISTER, this::handleRegister);
-        vertx.eventBus().<JsonArray>consumer(EventBusAddresses.TARGET_REGISTER_BULK, this::handleRegisterBulk);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.TARGET_LIST, this::handleList);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.TARGET_GET, this::handleGet);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.TARGET_DELETE, this::handleDelete);
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.TARGET_BULK_CHECK, this::handleBulkCheck);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_REGISTER, this::handleRegister);
+        vertx.eventBus().<JsonArray>localConsumer(EventBusAddresses.TARGET_REGISTER_BULK, this::handleRegisterBulk);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_LIST, this::handleList);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_GET, this::handleGet);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_DELETE, this::handleDelete);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_BULK_CHECK, this::handleBulkCheck);
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.TARGET_STATE_UPDATE, this::handleStateUpdate);
+
+        // Restore saved targets on startup
+        vertx.eventBus().<JsonObject>request(EventBusAddresses.PERSIST_TARGET_LOAD, new JsonObject())
+                .onSuccess(reply -> {
+                    JsonArray savedTargets = reply.body().getJsonArray("targets", new JsonArray());
+                    for (int i = 0; i < savedTargets.size(); i++) {
+                        JsonObject target = savedTargets.getJsonObject(i);
+                        String id = target.getString("id");
+                        if (id != null) {
+                            targets.put(id, target);
+                            vertx.eventBus().send(EventBusAddresses.SCHEDULER_TARGET_ADD, target);
+                        }
+                    }
+                    if (!savedTargets.isEmpty()) {
+                        log.info("Restored {} targets from disk storage", savedTargets.size());
+                    }
+                })
+                .onFailure(err -> log.debug("Persistence load unavailable: {}", err.getMessage()));
 
         log.info("TargetManager started");
         startPromise.complete();
@@ -48,6 +67,10 @@ public class TargetManager extends AbstractVerticle {
 
         vertx.eventBus().send(EventBusAddresses.SCHEDULER_TARGET_ADD, target);
         vertx.eventBus().send(EventBusAddresses.PERSIST_TARGET_SAVE, target);
+        vertx.eventBus().send(EventBusAddresses.AUDIT_LOG, new JsonObject()
+                .put("action", "TARGET_REGISTER")
+                .put("targetId", id)
+                .put("timestamp", System.currentTimeMillis()));
 
         msg.reply(new JsonObject().put("status", "CREATED").put("target", target));
     }
@@ -60,11 +83,18 @@ public class TargetManager extends AbstractVerticle {
             JsonObject target = bulkList.getJsonObject(i);
             if (isValid(target)) {
                 normalize(target);
-                targets.put(target.getString("id"), target);
+                String id = target.getString("id");
+                targets.put(id, target);
                 vertx.eventBus().send(EventBusAddresses.SCHEDULER_TARGET_ADD, target);
+                vertx.eventBus().send(EventBusAddresses.PERSIST_TARGET_SAVE, target);
                 count++;
             }
         }
+
+        vertx.eventBus().send(EventBusAddresses.AUDIT_LOG, new JsonObject()
+                .put("action", "TARGET_REGISTER_BULK")
+                .put("count", count)
+                .put("timestamp", System.currentTimeMillis()));
 
         msg.reply(new JsonObject()
                 .put("status", "ACCEPTED")
@@ -98,6 +128,10 @@ public class TargetManager extends AbstractVerticle {
         targets.remove(id);
         vertx.eventBus().send(EventBusAddresses.SCHEDULER_TARGET_REMOVE, new JsonObject().put("id", id));
         vertx.eventBus().send(EventBusAddresses.PERSIST_TARGET_DELETE, new JsonObject().put("id", id));
+        vertx.eventBus().send(EventBusAddresses.AUDIT_LOG, new JsonObject()
+                .put("action", "TARGET_DELETE")
+                .put("targetId", id)
+                .put("timestamp", System.currentTimeMillis()));
 
         msg.reply(new JsonObject().put("status", "DELETED").put("targetId", id));
     }
@@ -109,6 +143,18 @@ public class TargetManager extends AbstractVerticle {
         msg.reply(new JsonObject()
                 .put("status", "TRIGGERED")
                 .put("dispatchedCount", targets.size()));
+    }
+
+    private void handleStateUpdate(Message<JsonObject> msg) {
+        JsonObject update = msg.body();
+        String id = update.getString("id");
+        JsonObject target = targets.get(id);
+        if (target != null) {
+            target.put("state", update.getString("state"))
+                    .put("avg1m", update.getDouble("avg1m"))
+                    .put("avg5m", update.getDouble("avg5m"))
+                    .put("lastLatencyMs", update.getLong("lastLatencyMs"));
+        }
     }
 
     private boolean isValid(JsonObject target) {

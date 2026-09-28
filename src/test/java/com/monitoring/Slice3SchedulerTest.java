@@ -138,7 +138,7 @@ public class Slice3SchedulerTest {
         AtomicInteger checkCount = new AtomicInteger(0);
 
         // Listen to check execution on EventBus
-        vertx.eventBus().<JsonObject>consumer(EventBusAddresses.CHECK_EXECUTE, msg -> {
+        vertx.eventBus().<JsonObject>localConsumer(EventBusAddresses.CHECK_EXECUTE, msg -> {
             if (targetId.equals(msg.body().getString("id"))) {
                 int count = checkCount.incrementAndGet();
                 if (count >= 2) {

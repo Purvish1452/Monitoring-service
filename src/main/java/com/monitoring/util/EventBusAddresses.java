@@ -30,6 +30,7 @@ public final class EventBusAddresses {
     public static final String STATS_GET = "api.stats.get";
     public static final String ALERTS_LIST = "api.alerts.list";
     public static final String ALERT_EVENTS = "monitor.alert.events";
+    public static final String TARGET_STATE_UPDATE = "target.state.update";
 
     // Persistence Worker
     public static final String AUDIT_LOG = "monitor.audit.log";
