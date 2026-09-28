@@ -9,9 +9,8 @@ import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,85 +70,71 @@ public class PersistenceWorker extends AbstractVerticle {
     }
 
     private void handleLoadTargets(Message<JsonObject> msg) {
-        JsonArray array = new JsonArray();
-        persistedTargets.values().forEach(array::add);
+        JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
         msg.reply(new JsonObject().put("targets", array).put("count", array.size()));
     }
 
     private void handleAuditLog(JsonObject entry) {
-        if (entry != null) {
-            auditBuffer.add(entry);
-            if (auditBuffer.size() >= bufferCapacity) {
-                flushAuditBuffer();
-            }
+        if (entry == null) return;
+        auditBuffer.add(entry);
+        if (auditBuffer.size() >= bufferCapacity) {
+            flushAuditBuffer();
         }
     }
 
     private void loadTargetsFromDisk() {
-        File file = new File(targetsFilePath);
-        if (!file.exists()) {
-            return;
-        }
+        Path path = Path.of(targetsFilePath);
+        if (!Files.exists(path)) return;
 
         try {
-            String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            String content = Files.readString(path);
             if (!content.isBlank()) {
-                JsonObject json = new JsonObject(content);
-                JsonArray array = json.getJsonArray("targets", new JsonArray());
+                JsonArray array = new JsonObject(content).getJsonArray("targets", new JsonArray());
                 for (int i = 0; i < array.size(); i++) {
                     JsonObject target = array.getJsonObject(i);
-                    String id = target.getString("id");
-                    if (id != null) {
-                        persistedTargets.put(id, target);
-                    }
+                    persistedTargets.put(target.getString("id"), target);
                 }
                 log.info("Loaded {} targets from {}", persistedTargets.size(), targetsFilePath);
             }
         } catch (Exception e) {
-            log.warn("Failed to read {}: {}", targetsFilePath, e.getMessage());
+            log.warn("Could not load {}: {}", targetsFilePath, e.getMessage());
         }
     }
 
     private void writeTargetsToDisk() {
         try {
-            File file = new File(targetsFilePath);
-            if (file.getParentFile() != null) {
-                file.getParentFile().mkdirs();
+            Path path = Path.of(targetsFilePath);
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
             }
-
-            JsonArray array = new JsonArray();
-            persistedTargets.values().forEach(array::add);
+            JsonArray array = new JsonArray(new ArrayList<>(persistedTargets.values()));
             JsonObject json = new JsonObject().put("targets", array);
-
-            Files.writeString(file.toPath(), json.encodePrettily(), StandardCharsets.UTF_8);
+            Files.writeString(path, json.encodePrettily());
         } catch (Exception e) {
-            log.error("Failed to write to {}", targetsFilePath, e);
+            log.error("Failed to write to {}: {}", targetsFilePath, e.getMessage());
         }
     }
 
     private void flushAuditBuffer() {
-        if (auditBuffer.isEmpty()) {
-            return;
-        }
+        if (auditBuffer.isEmpty()) return;
 
-        List<JsonObject> toFlush = new ArrayList<>(auditBuffer);
+        List<JsonObject> batch = new ArrayList<>(auditBuffer);
         auditBuffer.clear();
 
         try {
-            File file = new File(auditLogFilePath);
-            if (file.getParentFile() != null) {
-                file.getParentFile().mkdirs();
+            Path path = Path.of(auditLogFilePath);
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
             }
 
             StringBuilder sb = new StringBuilder();
-            for (JsonObject entry : toFlush) {
-                sb.append(entry.encode()).append("\n");
+            for (JsonObject entry : batch) {
+                sb.append(entry.encode()).append('\n');
             }
 
-            Files.writeString(file.toPath(), sb.toString(), StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Files.writeString(path, sb.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (Exception e) {
-            log.error("Failed to flush audit logs to {}", auditLogFilePath, e);
+            log.error("Failed to flush audit logs to {}: {}", auditLogFilePath, e.getMessage());
         }
     }
 

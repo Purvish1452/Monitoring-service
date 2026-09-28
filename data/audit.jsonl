@@ -1,0 +1,31 @@
+{"action":"TARGET_REGISTER","targetId":"target-http-google","timestamp":1790572977969}
+{"action":"TARGET_REGISTER","targetId":"target-http-google","timestamp":1790573002955}
+{"action":"TARGET_REGISTER","targetId":"target-831f788f","timestamp":1790573010744}
+{"action":"TARGET_REGISTER","targetId":"target-tcp-dns-cf","timestamp":1790573025767}
+{"action":"TARGET_REGISTER","targetId":"target-failing-500","timestamp":1790573111681}
+{"action":"STATE_TRANSITION","targetId":"target-failing-500","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573119198}
+{"action":"TARGET_REGISTER","targetId":"target-failing-404","timestamp":1790573150084}
+{"action":"STATE_TRANSITION","targetId":"target-failing-404","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573153210}
+{"action":"TARGET_REGISTER","targetId":"target-failing-500","timestamp":1790573196813}
+{"action":"TARGET_REGISTER","targetId":"target-failing-404","timestamp":1790573204982}
+{"action":"TARGET_REGISTER","targetId":"target-tcp-closed-port","timestamp":1790573221009}
+{"action":"STATE_TRANSITION","targetId":"target-tcp-closed-port","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573223086}
+{"action":"TARGET_REGISTER","targetId":"target-slow-degraded-2s","timestamp":1790573242624}
+{"action":"STATE_TRANSITION","targetId":"target-slow-degraded-2s","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573244889}
+{"action":"TARGET_REGISTER","targetId":"target-timeout-blackhole","timestamp":1790573262871}
+{"action":"STATE_TRANSITION","targetId":"target-timeout-blackhole","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573266975}
+{"action":"TARGET_REGISTER_BULK","count":6,"timestamp":1790573307110}
+{"action":"STATE_TRANSITION","targetId":"target-tcp-closed-fail","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573309718}
+{"action":"STATE_TRANSITION","targetId":"target-slow-2s","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573310779}
+{"action":"STATE_TRANSITION","targetId":"target-error-500","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573311520}
+{"action":"STATE_TRANSITION","targetId":"target-error-404","fromState":"HEALTHY","toState":"CRITICAL","reason":"3 consecutive check failures","timestamp":1790573311660}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573373835}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"DEGRADED","toState":"HEALTHY","reason":"Latency returned to normal","timestamp":1790573375204}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573380885}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"DEGRADED","toState":"HEALTHY","reason":"Latency returned to normal","timestamp":1790573381206}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573545600}
+{"action":"STATE_TRANSITION","targetId":"target-http-google","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573545650}
+{"action":"STATE_TRANSITION","targetId":"target-google-ok","fromState":"HEALTHY","toState":"DEGRADED","reason":"Latency exceeded 1500ms","timestamp":1790573545651}
+{"action":"STATE_TRANSITION","targetId":"target-http-google","fromState":"DEGRADED","toState":"HEALTHY","reason":"Latency returned to normal","timestamp":1790573546219}
+{"action":"STATE_TRANSITION","targetId":"target-831f788f","fromState":"DEGRADED","toState":"HEALTHY","reason":"Latency returned to normal","timestamp":1790573546493}
+{"action":"STATE_TRANSITION","targetId":"target-google-ok","fromState":"DEGRADED","toState":"HEALTHY","reason":"Latency returned to normal","timestamp":1790573546532}

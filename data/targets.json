@@ -1,0 +1,105 @@
+{
+  "targets" : [ {
+    "id" : "target-tcp-closed-port",
+    "type" : "TCP",
+    "ip" : "127.0.0.1",
+    "port" : 59998,
+    "intervalSeconds" : 1,
+    "timeoutMs" : 1000,
+    "retryPolicy" : {
+      "maxAttempts" : 2,
+      "baseDelayMs" : 50,
+      "backoffFactor" : 2.0
+    }
+  }, {
+    "id" : "target-failing-500",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/status/500",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000,
+    "expectedStatusCode" : 200
+  }, {
+    "id" : "target-failing-404",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/status/404",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000,
+    "expectedStatusCode" : 200
+  }, {
+    "id" : "target-http-google",
+    "type" : "HTTP",
+    "url" : "https://www.google.com",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000,
+    "expectedStatusCode" : 200
+  }, {
+    "id" : "target-google-ok",
+    "type" : "HTTP",
+    "url" : "https://www.google.com",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000
+  }, {
+    "id" : "target-tcp-closed-fail",
+    "type" : "TCP",
+    "ip" : "127.0.0.1",
+    "port" : 59998,
+    "intervalSeconds" : 1,
+    "timeoutMs" : 1000
+  }, {
+    "id" : "target-slow-2s",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/delay/2",
+    "intervalSeconds" : 3,
+    "timeoutMs" : 4000
+  }, {
+    "id" : "target-timeout-blackhole",
+    "type" : "HTTP",
+    "url" : "http://10.255.255.1/blackhole",
+    "intervalSeconds" : 2,
+    "timeoutMs" : 1000,
+    "retryPolicy" : {
+      "maxAttempts" : 2,
+      "baseDelayMs" : 50,
+      "backoffFactor" : 2.0
+    }
+  }, {
+    "id" : "target-tcp-dns-cf",
+    "type" : "TCP",
+    "ip" : "1.1.1.1",
+    "port" : 53,
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000
+  }, {
+    "id" : "target-tcp-dns-ok",
+    "type" : "TCP",
+    "ip" : "8.8.8.8",
+    "port" : 53,
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000
+  }, {
+    "id" : "target-error-500",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/status/500",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000
+  }, {
+    "type" : "HTTP",
+    "url" : "https://cloudflare.com",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000,
+    "id" : "target-831f788f"
+  }, {
+    "id" : "target-error-404",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/status/404",
+    "intervalSeconds" : 1,
+    "timeoutMs" : 2000
+  }, {
+    "id" : "target-slow-degraded-2s",
+    "type" : "HTTP",
+    "url" : "https://httpbin.org/delay/2",
+    "intervalSeconds" : 3,
+    "timeoutMs" : 4000,
+    "expectedStatusCode" : 200
+  } ]
+}
