@@ -12,19 +12,18 @@ To achieve this, we chose an **Asynchronous Actor-based Architecture** using **E
 
 | Component | Instance Count | Threading Model | Rationale |
 | :--- | :---: | :--- | :--- |
-| **`PersistenceWorker`** | **1** | Standard Verticle (EventLoop) + Dedicated Worker Pool | Single verticle manages the in-memory persistence mirror and coordinates batch flushes. Avoids multi-process file contention. |
+| **`PersistenceWorker`** | **1** | Standard Verticle (EventLoop) + Async FileSystem | Single verticle manages the in-memory persistence mirror and coordinates batch flushes via non-blocking `vertx.fileSystem()`. Avoids multi-process file contention and eliminates complex locks. |
 | **`TargetManager`** | **1** | Standard Verticle (EventLoop) | Single source of truth for target registration and CRUD. Eliminates split-brain registry states and avoids cluster sync overhead. |
 | **`TargetScheduler`** | **1** | Standard Verticle (EventLoop) | A single Min-Heap (`PriorityQueue`) driven by a single 20ms tick timer efficiently tracks all 5,000 targets without duplicate tick events. |
 | **`StatsManager`** | **1** | Standard Verticle (EventLoop) | Maintains in-memory 300s ring buffers and health state machines for all targets. Single-threaded access guarantees zero-lock math computations. |
 | **`CheckManager`** | **2** | Standard Verticle (EventLoop) | Scales outbound network I/O. Vert.x automatically round-robins check dispatch events across the 2 instances, distributing HTTP/TCP socket polling across CPU cores. |
 | **`HttpServer`** | **2** | Standard Verticle (EventLoop) | Listens on port 8080 with socket reuse (`SO_REUSEPORT`). Inbound HTTP requests are automatically load-balanced across 2 event loops. |
-| **`persistence-worker-pool`** | **5 threads** | Dedicated `WorkerExecutor` | Dedicated bulkhead pool isolating all blocking disk I/O. Prevents disk stalls from starving the default Vert.x worker pool. |
 
 ---
 
-## 3. Event Loop vs. Worker Execution Boundaries
+## 3. Event Loop vs. Non-Blocking FileSystem Boundaries
 
-The Vert.x Golden Rule (**"Never block the Event Loop"**) is strictly enforced across the codebase.
+The Vert.x Golden Rule (**"Never block the Event Loop"**) is strictly enforced across the codebase:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -36,16 +35,16 @@ The Vert.x Golden Rule (**"Never block the Event Loop"**) is strictly enforced a
 │  • Non-blocking HTTP (WebClient) & TCP (NetClient) Probe Dispatch           │
 │  • Zero-Allocation 300s Ring Buffer Updates (SlidingWindowStats)            │
 │  • Anti-Flapping State Machine Transitions (TargetHealthFSM)                │
-│  • RAM Map/Queue Updates in PersistenceWorker (persistedTargets, auditBuffer)│
+│  • Fast RAM Map/List Updates in PersistenceWorker (persistedTargets, audit) │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ Offloaded via executor.executeBlocking()
+                                       │ Non-blocking Vert.x Future Pipelines
 ┌──────────────────────────────────────▼──────────────────────────────────────┐
-│                  DEDICATED WORKER POOL (Blocking Disk I/O)                  │
+│             VERT.X ASYNCHRONOUS FILESYSTEM ENGINE (Internal Async I/O)      │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  • Initial Startup Target Loading (Files.readString)                        │
-│  • Periodic / Triggered Target File Overwrites (Files.writeString)          │
-│  • Batch Audit Log Appending (Files.writeString with APPEND option)         │
-│  • Pretty JSON File Formatting for Disk Exports                             │
+│  • Initial Startup Target Loading (vertx.fileSystem().readFile)             │
+│  • Asynchronous Target File Overwrites (vertx.fileSystem().writeFile)       │
+│  • Asynchronous Batch Audit Appends (vertx.fileSystem().open + write)       │
+│  • Automatic Parent Directory Creation (vertx.fileSystem().mkdirs)          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,7 +52,7 @@ The Vert.x Golden Rule (**"Never block the Event Loop"**) is strictly enforced a
 
 ## 4. Shared State & Concurrency Protection
 
-To maximize performance, shared state is minimized and isolated using the Actor model and concurrency primitives:
+To maximize performance, shared state is minimized and isolated using the Actor model and **Thread Confinement**:
 
 ### A. Target Registry & Scheduler State (Thread-Confined)
 - **`TargetManager`** and **`TargetScheduler`** maintain state exclusively on their assigned EventLoop threads.
@@ -64,13 +63,13 @@ To maximize performance, shared state is minimized and isolated using the Actor 
 - **`SlidingWindowStats`** (primitive arrays: `long[] timestamps`, `long[] latencies`, `int[] successCounts`) and **`TargetHealthFSM`** (3 primitive fields) are confined to **`StatsManager`**'s EventLoop thread.
 - **Protection**: **Thread Confinement**. Zero mutexes, zero atomic contention, and zero GC allocation on `noChange` updates.
 
-### C. Persistence & Audit Buffer (Multi-Thread Protected)
-- **`persistedTargets`**: `ConcurrentHashMap<String, JsonObject>`
-  - *Protection*: Lock-free reads/writes via CPU CAS and bucket-level locks. Defensive copies (`target.copy()`) prevent external mutation.
-- **`auditBuffer` & `bufferSize`**: `ConcurrentLinkedQueue<JsonObject>` & `AtomicInteger`
-  - *Protection*: Lock-free FIFO queue (Michael-Scott algorithm) for nanosecond event ingestion and atomic size tracking.
-- **Disk File Locks**: `synchronized (targetFileLock)` and `synchronized (auditFileLock)`
-  - *Protection*: JVM monitor synchronization inside `executeBlocking` guarantees physical files (`targets.json`, `audit.jsonl`) are never corrupted by concurrent worker threads.
+### C. Persistence & Audit Buffer (Thread-Confined & Non-Blocking)
+- **`persistedTargets`**: `Map<String, JsonObject> = new HashMap<>()`
+  - *Protection*: Confined strictly to `PersistenceWorker`'s single EventLoop thread. Defensive copies (`target.copy()`) preserve immutability.
+- **`auditBuffer`**: `List<JsonObject> = new ArrayList<>()`
+  - *Protection*: Confined to `PersistenceWorker`'s EventLoop thread. Batches are drained and cleared synchronously in RAM before dispatching to the async filesystem.
+- **Physical Disk Files**:
+  - *Protection*: Written via Vert.x async `FileSystem` (`writeFile` and `appendFile` with `OpenOptions`). Since operations are triggered sequentially from the single EventLoop thread, physical files (`targets.json`, `audit.jsonl`) are never corrupted.
 
 ---
 
@@ -103,11 +102,11 @@ Under heavy load (5,000 targets monitored every 1 second = 5,000 checks/sec), qu
                            │
                            ▼
 ┌────────────────────────────────────────────────────────┐
-│ 3. PersistenceWorker Audit Buffer Queue                │
-│    - ConcurrentLinkedQueue<JsonObject>                 │
+│ 3. PersistenceWorker Audit Buffer (ArrayList in RAM)   │
 │    - Flushed immediately when size >= bufferCapacity   │
+│      (100 entries batch)                               │
 │    - Flushed periodically every flushIntervalMs (1s)   │
-│    - Peak memory bounded to < 500 KB                   │
+│    - Peak memory bounded to < 100 KB                   │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -119,4 +118,4 @@ Under heavy load (5,000 targets monitored every 1 second = 5,000 checks/sec), qu
    - Protects the JVM and OS network stack from exhausting file descriptors (`ulimit -n`).
 3. **`PersistenceWorker` Audit Buffer**:
    - Buffered in memory and flushed in batches of 100 entries or every 1,000ms.
-   - Converts thousands of individual disk writes into single sequential disk appends, reducing disk IOPS by over 98%.
+   - Converts thousands of individual disk writes into single sequential async disk appends, reducing disk IOPS by over 98%.

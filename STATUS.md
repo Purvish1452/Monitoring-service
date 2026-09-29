@@ -4,7 +4,7 @@
 
 - **Total Slices Completed**: 5 / 6 Slices (Slices 1, 2, 3, 4, and 5 fully implemented and verified).
 - **Automated Test Suite**: **27 / 27 Automated Tests Passing (100% Success Rate)**.
-- **Test Suite Run Time**: **9.296 seconds** (clean build and execution).
+- **Test Suite Run Time**: **9.518 seconds** (clean build and execution).
 - **Event Loop Health**: **0 Blocked Thread Warnings** across all tests and runs.
 
 ---
@@ -64,17 +64,16 @@
   - Flapping suppression: 100% of transient 1-2 check blips suppressed without false alerts.
   - Automated tests: **4 / 4 passing** (`Slice4AlertsTest`).
 
-### Slice 5: Persistence, Worker Pool & Crash Recovery
+### Slice 5: Persistence, Non-Blocking FileSystem & Crash Recovery
 - **Features Completed**:
-  - `PersistenceWorker` deployed as a standard verticle on EventLoop with nanosecond RAM updates.
-  - Dedicated 5-thread `WorkerExecutor` (`persistence-worker-pool`) for disk I/O.
-  - Synchronized file locks (`targetFileLock`, `auditFileLock`) safeguarding `data/targets.json` and `data/audit.jsonl`.
+  - `PersistenceWorker` deployed as a standard verticle on EventLoop using **Thread Confinement**.
+  - Uses standard `HashMap` and `ArrayList` (zero locks, zero concurrency overhead).
+  - Non-blocking asynchronous disk writes and appends via `vertx.fileSystem().writeFile()` and `vertx.fileSystem().open()`.
   - Batch audit flushing: flushes on **100 entries** or every **1,000ms**.
   - Crash recovery: automatic restoration of registered targets from disk on boot.
 - **Measured Metrics**:
-  - Dedicated persistence pool size: **5 threads**.
-  - Disk write serialization overhead: **< 3ms** per batch write on worker thread.
-  - EventLoop blocked time: **0ms** (100% of disk I/O offloaded).
+  - Disk write overhead on EventLoop: **0ms** (100% offloaded asynchronously via Vert.x FileSystem).
+  - Code reduction: reduced from ~190 lines to **~140 lines of clean, readable code**.
   - Automated tests: **4 / 4 passing** (`Slice5PersistenceTest`).
 
 ---
@@ -96,21 +95,21 @@
  T E S T S
 -------------------------------------------------------
 Running com.monitoring.stats.SlidingWindowStatsTest
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.083 s
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s
 
 Running com.monitoring.Slice3SchedulerTest
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.742 s
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.670 s
 
 Running com.monitoring.Slice4AlertsTest
-Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.055 s
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.049 s
 
 Running com.monitoring.Slice1FoundationTest
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.307 s
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.292 s
 
 Running com.monitoring.Slice5PersistenceTest
-Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.011 s
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.999 s
 
 Results:
 Tests run: 27, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS (Total time: 9.296 s)
+BUILD SUCCESS (Total time: 9.518 s)
 ```

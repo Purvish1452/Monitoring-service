@@ -84,13 +84,13 @@ The system uses an asynchronous, event-driven actor model powered by the Vert.x 
 
 ```mermaid
 graph TD
-    HTTP["HttpServer (Port 8080)"]
-    TM["TargetManager (Registry)"]
+    HTTP["HttpServer (Port 8080, 2 instances)"]
+    TM["TargetManager (Registry CRUD)"]
     TS["TargetScheduler (20ms Min-Heap)"]
     CM["CheckManager (HTTP and TCP Probes)"]
     SM["StatsManager (FSM and Ring Buffers)"]
     PW["PersistenceWorker (EventBus Consumer)"]
-    WPOOL["WorkerExecutor (5 Threads)"]
+    VFS["Vert.x Async FileSystem Engine"]
     DISK1["targets.json"]
     DISK2["audit.jsonl"]
 
@@ -101,9 +101,9 @@ graph TD
     SM -->|target.state.change| HTTP
     TM -->|persist.target.save/delete| PW
     SM -->|audit.log| PW
-    PW -->|executeBlocking| WPOOL
-    WPOOL --> DISK1
-    WPOOL --> DISK2
+    PW -->|async writeFile/appendFile| VFS
+    VFS --> DISK1
+    VFS --> DISK2
 ```
 
 ### Visual Architecture Flow
@@ -142,12 +142,13 @@ graph TD
  |                    Persistence & Audit Layer                          |
  |                                                                       |
  |   +---------------------------------------------------------------+   |
- |   |          PersistenceWorker (EventBus Message Consumer)        |   |
+ |   |     PersistenceWorker (Single EventLoop Thread Confinement)   |   |
+ |   |     - Plain HashMap & ArrayList (Zero locks, 100% safe)       |   |
  |   +-------------------------------+-------------------------------+   |
- |                                   | executeBlocking                   |
+ |                                   | async non-blocking Future I/O     |
  |                                   v                                   |
  |   +---------------------------------------------------------------+   |
- |   |         Dedicated WorkerExecutor Pool (5 Threads)             |   |
+ |   |              Vert.x Async FileSystem Engine                   |   |
  |   +---------------+-------------------------------+---------------+   |
  |                   |                               |                   |
  |                   v                               v                   |
